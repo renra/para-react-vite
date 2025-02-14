@@ -1,14 +1,21 @@
+import { SigningCosmWasmClient } from '@cosmjs/cosmwasm-stargate';
+import { StdFee } from '@cosmjs/stargate';
+import { ParaProtoSigner } from '@getpara/cosmjs-v0-integration';
 import Para, { Environment } from '@getpara/react-sdk';
 import React, { useCallback, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 
 type Env = {
+  contract: string
+  rpc: string
   apiKey: string
   environment: Environment
 }
 
 const env : Env = {
-  apiKey : 'TODO',
+  contract: 'CHANGEME',
+  rpc : 'CHANGEME',
+  apiKey : 'CHANGEME',
   environment : Environment.PRODUCTION,
 }
 
@@ -30,15 +37,15 @@ const Main = () : JSX.Element => {
   const [connectedWallet, setConnectedWallet] = useState<string | undefined>(undefined)
 
   const updateEmail = useCallback(
-    (e) => {
-      setEmail(e.value)
+    (e: { target: { value: React.SetStateAction<string>; }; }) => {
+      setEmail(e.target.value)
     },
     [setEmail]
   )
 
   const updateOTP = useCallback(
-    (e) => {
-      setOTP(e.value)
+    (e: { target: { value: React.SetStateAction<string>; }; }) => {
+      setOTP(e.target.value)
     },
     [setEmail]
   )
@@ -48,7 +55,7 @@ const Main = () : JSX.Element => {
     setNeedsOTP(false)
 
     try {
-      console.log('Checking if user exists')
+      console.log(`Checking if user exists for email ${email}`)
       const userFound = await para.checkIfUserExists({ email })
 
       if(!userFound) {
@@ -68,31 +75,26 @@ const Main = () : JSX.Element => {
           const hasWallet = await para.waitForLoginAndSetup({
             popupWindow: popup
           });
-          
+
+          if (!hasWallet || hasWallet.isError || !hasWallet.isComplete) {
+            console.error('No wallet after login')
+          } else {
+            const wallet = getWallet()
+
+            if(wallet) {
+              console.log('Logged in')
+              setConnectedWallet(wallet)
+            } else {
+              console.error('No wallet in the para instance')
+            }
+          }        
         } else {
           console.error("Could not open popup")
           return
         }
-
-        const hasWallet = await para.waitForLoginAndSetup({
-          popupWindow: popup
-        });
-
-        if (!hasWallet || hasWallet.isError || !hasWallet.isComplete) {
-          console.error('No wallet after login')
-        } else {
-          const wallet = getWallet()
-
-          if(wallet) {
-            console.log('Logged in')
-            setConnectedWallet(wallet)
-          } else {
-            console.error('No wallet in the para instance')
-          }
-        }
       }
     } catch(e) {
-      console.error('Error when logging in: ${JSON.stringify(e)}')
+      console.error(`Error when logging in: ${JSON.stringify(e)}`)
     }
   }, [
     openPopup,
@@ -125,7 +127,7 @@ const Main = () : JSX.Element => {
         console.error("Could not open verification popup")
       }
     } catch(e) {
-      console.error('Error when verifying: ${JSON.stringify(e)}')
+      console.error(`Error when verifying: ${JSON.stringify(e)}`)
     }
 
     return false
@@ -135,6 +137,30 @@ const Main = () : JSX.Element => {
     setConnectedWallet,
     setNeedsOTP
   ]);
+
+  const sendTx = useCallback(
+    async (address: string) => {
+      const signer = new ParaProtoSigner(para, 'sge')
+      const client = await SigningCosmWasmClient.connectWithSigner(env.rpc, signer)
+
+      console.log('Broadcasting tx ...')
+      const fee : StdFee = {
+        amount: [{ amount: '5000', denom: 'usge' }],
+        gas: '500000'
+      }
+
+      const res = client.execute(
+        address,
+        env.contract,
+        { hi: {} },
+        fee,
+        'auto'
+      )
+
+      console.log(`TX result: ${JSON.stringify(res)}`)
+    },
+    []
+  )
   
   return (
     <>
@@ -147,6 +173,18 @@ const Main = () : JSX.Element => {
               <>
                 <div>
                   You're connected with {connectedWallet}
+                </div>
+
+                <div>
+                  <button onClick={() => { setConnectedWallet(undefined) }}>
+                    Disconnect
+                  </button>
+                </div>
+
+                <div>
+                  <button onClick={() => { sendTx(connectedWallet) }}>
+                    Send a transaction
+                  </button>
                 </div>
               </>
             )
