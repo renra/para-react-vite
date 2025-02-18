@@ -1,23 +1,10 @@
 import { SigningCosmWasmClient } from '@cosmjs/cosmwasm-stargate';
 import { StdFee } from '@cosmjs/stargate';
 import { ParaProtoSigner } from '@getpara/cosmjs-v0-integration';
-import Para, { Environment } from '@getpara/react-sdk';
+import Para from '@getpara/react-sdk';
 import React, { useCallback, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-
-type Env = {
-  contract: string
-  rpc: string
-  apiKey: string
-  environment: Environment
-}
-
-const env : Env = {
-  contract: 'CHANGEME',
-  rpc : 'CHANGEME',
-  apiKey : 'CHANGEME',
-  environment : Environment.PRODUCTION,
-}
+import { env } from './env';
 
 const para = new Para(env.environment, env.apiKey);
 
@@ -149,15 +136,20 @@ const Main = () : JSX.Element => {
         gas: '500000'
       }
 
-      const res = client.execute(
-        address,
-        env.contract,
-        { hi: {} },
-        fee,
-        'auto'
-      )
+      try {
+        const res = await client.execute(
+          address,
+          env.contract,
+          { hi: {} },
+          fee,
+          'auto'
+        )
 
-      console.log(`TX result: ${JSON.stringify(res)}`)
+        console.log(`TX result: ${JSON.stringify(res)}`)
+      } catch(err) {
+        const e = err as Error
+        console.error(e.stack)
+      }
     },
     []
   )
